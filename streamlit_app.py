@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 from pathlib import Path
 from typing import Dict, List
 
 import numpy as np
 import pandas as pd
 import streamlit as st
+from openai import OpenAI
 from sentence_transformers import SentenceTransformer
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
@@ -21,12 +24,174 @@ from chart_helpers import (
 PARSED_VS_PATH = Path("data/parsed_vs_ideas.json")
 METRICS_PATH = Path("data/diversity_metrics.json")
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+DEFAULT_LIVE_MODEL = "openai/gpt-oss-20b:free"
+
+RESPONSE_BLOCK_RE = re.compile(r"<response>(.*?)</response>", re.DOTALL | re.IGNORECASE)
+TEXT_RE = re.compile(r"<text>(.*?)</text>", re.DOTALL | re.IGNORECASE)
+PROBABILITY_RE = re.compile(
+    r"<probability>\s*([0-9]*\.?[0-9]+)\s*</probability>", re.IGNORECASE
+)
+IDEA_LINE_RE = re.compile(r"startup idea\s*:\s*(.+)", re.IGNORECASE)
+CUSTOMER_LINE_RE = re.compile(r"target customer\s*:\s*(.+)", re.IGNORECASE)
+GTM_LINE_RE = re.compile(r"go-to-market strategy\s*:\s*(.+)", re.IGNORECASE)
 
 
 def _load_json(path: Path):
     if not path.exists():
         raise FileNotFoundError(f"Required file not found: {path}")
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _get_secret_or_env(name: str) -> str | None:
+    if name in st.secrets:
+        value = str(st.secrets[name]).strip()
+        return value if value else None
+    value = os.getenv(name)
+    return value.strip() if value else None
+
+
+def _extract_line_value(pattern: re.Pattern[str], text: str) -> str:
+    for line in text.splitlines():
+        match = pattern.search(line.strip())
+        if match:
+            return match.group(1).strip()
+    return ""
+
+
+def parse_live_response(raw_output: str) -> pd.DataFrame:
+    rows: List[Dict[str, object]] = []
+    blocks = RESPONSE_BLOCK_RE.findall(raw_output)
+    for idx, block in enumerate(blocks, start=1):
+        text_match = TEXT_RE.search(block)
+        prob_match = PROBABILITY_RE.search(block)
+        if not text_match:
+            continue
+
+        text = text_match.group(1).strip()
+        try:
+            probability = float(prob_match.group(1)) if prob_match else np.nan
+        except ValueError:
+            probability = np.nan
+
+        rows.append(
+            {
+                "rank": idx,
+                "idea": _extract_line_value(IDEA_LINE_RE, text) or text,
+                "target_customer": _extract_line_value(CUSTOMER_LINE_RE, text),
+                "go_to_market_strategy": _extract_line_value(GTM_LINE_RE, text),
+                "probability": probability,
+                "raw_text": text,
+            }
+        )
+
+    if rows:
+        return pd.DataFrame(rows)
+    return pd.DataFrame(
+        [{"rank": 1, "idea": raw_output.strip(), "target_customer": "", "go_to_market_strategy": "", "probability": np.nan, "raw_text": raw_output.strip()}]
+    )
+
+
+def generate_live_ideas(topic: str, num_responses: int, model: str) -> tuple[str, pd.DataFrame]:
+    api_key = _get_secret_or_env("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError(
+            "Missing OPENAI_API_KEY. Add it in Streamlit Secrets or environment variables."
+        )
+    base_url = _get_secret_or_env("OPENAI_BASE_URL")
+    client = OpenAI(api_key=api_key, base_url=base_url) if base_url else OpenAI(api_key=api_key)
+
+    prompt = f"""
+Generate exactly {num_responses} startup ideas for topic: {topic}
+
+Each response must be:
+<response>
+<text>startup idea: ...
+target customer: ...
+go-to-market strategy: ...</text>
+<probability>...</probability>
+</response>
+
+Rules:
+- probability must be numeric and < 0.10
+- sample from the tails (uncommon, non-obvious concepts)
+- no markdown or additional commentary
+""".strip()
+
+    completion = client.chat.completions.create(
+        model=model,
+        temperature=0.9,
+        messages=[
+            {"role": "system", "content": "You are an expert AI startup strategist."},
+            {"role": "user", "content": prompt},
+        ],
+    )
+
+    raw_output = (completion.choices[0].message.content or "").strip()
+    return raw_output, parse_live_response(raw_output)
+
+
+def generate_live_ideas_by_mode(
+    *,
+    topic: str,
+    num_responses: int,
+    model: str,
+    mode: str,
+) -> tuple[str, pd.DataFrame]:
+    api_key = _get_secret_or_env("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError(
+            "Missing OPENAI_API_KEY. Add it in Streamlit Secrets or environment variables."
+        )
+    base_url = _get_secret_or_env("OPENAI_BASE_URL")
+    client = OpenAI(api_key=api_key, base_url=base_url) if base_url else OpenAI(api_key=api_key)
+
+    if mode == "verbalized":
+        prompt = f"""
+Generate exactly {num_responses} startup ideas for topic: {topic}.
+Sample from the tails of the distribution and prioritize non-obvious ideas.
+
+Each response must be:
+<response>
+<text>startup idea: ...
+target customer: ...
+go-to-market strategy: ...</text>
+<probability>...</probability>
+</response>
+
+Rules:
+- probability must be numeric and < 0.10
+- no markdown or additional commentary
+""".strip()
+        system_message = "You are an expert AI startup strategist focused on unconventional ideas."
+    else:
+        prompt = f"""
+Generate exactly {num_responses} practical startup ideas for topic: {topic}.
+
+Each response must be:
+<response>
+<text>startup idea: ...
+target customer: ...
+go-to-market strategy: ...</text>
+<probability>...</probability>
+</response>
+
+Rules:
+- probability must be numeric and < 0.10
+- no markdown or additional commentary
+""".strip()
+        system_message = "You are an expert AI startup strategist."
+
+    completion = client.chat.completions.create(
+        model=model,
+        temperature=0.9,
+        messages=[
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": prompt},
+        ],
+    )
+
+    raw_output = (completion.choices[0].message.content or "").strip()
+    return raw_output, parse_live_response(raw_output)
 
 
 @st.cache_data
@@ -165,6 +330,100 @@ def main() -> None:
 
     st.title("VS Startup Bench Dashboard")
     st.caption("Experiment analytics for diversity in AI startup ideation")
+
+    st.markdown("## Live Idea Generator")
+    st.write(
+        "Single prompt ingestion with dual generation: **Direct Prompting** and "
+        "**Verbalized Prompting** side-by-side."
+    )
+    with st.form("live_generation_form"):
+        c1, c2 = st.columns([2, 1])
+        topic_input = c1.text_input(
+            "Topic / Prompt",
+            value="AI healthcare",
+            placeholder="e.g. AI legal ops, AI climate risk, AI creator tools",
+        )
+        count_input = c2.slider("Responses", min_value=3, max_value=8, value=5, step=1)
+        model_input = st.text_input(
+            "Model",
+            value=_get_secret_or_env("OPENAI_MODEL") or DEFAULT_LIVE_MODEL,
+            help="Set default via OPENAI_MODEL secret/env.",
+        )
+        generate_clicked = st.form_submit_button("Generate Ideas")
+
+    if generate_clicked:
+        if not topic_input.strip():
+            st.warning("Please provide a topic.")
+        else:
+            with st.spinner("Generating ideas..."):
+                try:
+                    direct_raw, direct_df = generate_live_ideas_by_mode(
+                        topic=topic_input.strip(),
+                        num_responses=count_input,
+                        model=model_input.strip(),
+                        mode="direct",
+                    )
+                    verbalized_raw, verbalized_df = generate_live_ideas_by_mode(
+                        topic=topic_input.strip(),
+                        num_responses=count_input,
+                        model=model_input.strip(),
+                        mode="verbalized",
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    st.error(f"Live generation failed: {exc}")
+                else:
+                    st.success(
+                        f"Generated {len(direct_df)} direct ideas and {len(verbalized_df)} verbalized ideas."
+                    )
+
+                    left, right = st.columns(2)
+                    with left:
+                        st.markdown("### Direct Prompting")
+                        st.dataframe(
+                            direct_df[
+                                [
+                                    "rank",
+                                    "idea",
+                                    "target_customer",
+                                    "go_to_market_strategy",
+                                    "probability",
+                                ]
+                            ],
+                            use_container_width=True,
+                            hide_index=True,
+                        )
+                        st.download_button(
+                            label="Download direct ideas (JSON)",
+                            data=json.dumps(direct_df.to_dict(orient="records"), indent=2),
+                            file_name="direct_live_generated_ideas.json",
+                            mime="application/json",
+                        )
+                        with st.expander("Direct raw model output"):
+                            st.code(direct_raw)
+
+                    with right:
+                        st.markdown("### Verbalized Prompting")
+                        st.dataframe(
+                            verbalized_df[
+                                [
+                                    "rank",
+                                    "idea",
+                                    "target_customer",
+                                    "go_to_market_strategy",
+                                    "probability",
+                                ]
+                            ],
+                            use_container_width=True,
+                            hide_index=True,
+                        )
+                        st.download_button(
+                            label="Download verbalized ideas (JSON)",
+                            data=json.dumps(verbalized_df.to_dict(orient="records"), indent=2),
+                            file_name="verbalized_live_generated_ideas.json",
+                            mime="application/json",
+                        )
+                        with st.expander("Verbalized raw model output"):
+                            st.code(verbalized_raw)
 
     try:
         ideas_df, metrics = load_data()
