@@ -1,0 +1,10 @@
+openai>=1.40,<2.0
+numpy>=1.26,<3.0
+pandas>=2.2,<3.0
+scipy>=1.13,<2.0
+scikit-learn>=1.5,<2.0
+sentence-transformers>=3.0,<4.0
+streamlit>=1.36,<2.0
+matplotlib>=3.9,<4.0
+plotly>=5.23,<6.0
+tqdm>=4.66,<5.0

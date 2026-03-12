@@ -1,0 +1,202 @@
+[
+  {
+    "topic": "AI healthcare",
+    "idea": "AI-powered digital twin organ simulation platform that creates a real-time, patient-specific virtual model of organs (e.g., heart, liver) for surgical planning, intraoperative guidance, and post-operative monitoring.",
+    "probability": 0.04
+  },
+  {
+    "topic": "AI healthcare",
+    "idea": "AI-driven real-time infection risk mapping system that aggregates data from hospital environmental sensors, patient movement logs, and microbiome samples to predict and visualize hotspots for hospital-acquired infections.",
+    "probability": 0.03
+  },
+  {
+    "topic": "AI healthcare",
+    "idea": "AI-enabled retinal imaging platform that analyzes retinal photographs to predict systemic diseases such as diabetes, hypertension, chronic kidney disease, and cardiovascular risk, enabling early intervention.",
+    "probability": 0.02
+  },
+  {
+    "topic": "AI healthcare",
+    "idea": "AI-powered voice and speech analysis tool that detects subtle changes in prosody, articulation, and pause patterns to flag early cognitive decline and mental health disorders, integrated into telehealth platforms.",
+    "probability": 0.03
+  },
+  {
+    "topic": "AI healthcare",
+    "idea": "AI-driven precision oncology platform that integrates genomic, proteomic, and transcriptomic data to predict individual patient response to immunotherapy agents, providing evidence-based treatment recommendations.",
+    "probability": 0.02
+  },
+  {
+    "topic": "AI developer tools",
+    "idea": "AI-driven code review with emotional tone analysis that flags not only bugs but also code that may cause developer burnout or conflict. target customer: mid-size software teams and remote-first companies. go-to-market strategy: integrate as a GitHub Action and offer a freemium tier for open-source projects, then upsell to enterprise with advanced sentiment analytics and compliance reporting.",
+    "probability": 0.02
+  },
+  {
+    "topic": "AI developer tools",
+    "idea": "AI-powered API contract generator that auto-creates OpenAPI specs from code and automatically generates unit and integration tests. target customer: backend developers building microservices. go-to-market strategy: partner with popular frameworks (Express, FastAPI) to ship as a CLI plugin, use community events and hackathons to drive adoption, then offer a SaaS layer for continuous contract validation.",
+    "probability": 0.02
+  },
+  {
+    "topic": "AI developer tools",
+    "idea": "AI sandbox for quantum algorithm prototyping that simulates quantum circuits with realistic noise models and suggests optimizations. target customer: researchers and developers exploring quantum computing. go-to-market strategy: launch a cloud-based notebook service, collaborate with universities, and provide a free tier for academic projects, then monetize through enterprise licenses and consulting.",
+    "probability": 0.02
+  },
+  {
+    "topic": "AI developer tools",
+    "idea": "AI-driven dependency graph visualizer with risk scoring that highlights outdated, vulnerable, or license-violating packages in real time. target customer: DevOps teams and security auditors. go-to-market strategy: embed as a VS Code extension, offer a SaaS dashboard for CI pipelines, and partner with security scanning tools to bundle the service.",
+    "probability": 0.02
+  },
+  {
+    "topic": "AI developer tools",
+    "idea": "AI-based code plagiarism detection for open-source contributions that uses semantic analysis to detect subtle code reuse. target customer: open-source maintainers and large organizations managing internal forks. go-to-market strategy: provide a GitHub App with a free tier for public repos, then sell premium features like automated pull request labeling and compliance reports to enterprises.",
+    "probability": 0.02
+  },
+  {
+    "topic": "AI education",
+    "idea": "AI‑generated micro‑credential marketplace that auto‑updates course content and credentials as industry standards evolve, using blockchain for verifiable ownership.",
+    "probability": 0.04
+  },
+  {
+    "topic": "AI education",
+    "idea": "Adaptive AI tutor for neurodiverse learners that uses multimodal data (eye tracking, voice tone, gesture) to personalize pacing and content delivery in real time.",
+    "probability": 0.03
+  },
+  {
+    "topic": "AI education",
+    "idea": "AI‑powered curriculum design platform that predicts future job market demands via large‑scale labor data and auto‑generates modular courses, complete with assessment rubrics.",
+    "probability": 0.02
+  },
+  {
+    "topic": "AI education",
+    "idea": "AI mentorship matching platform that pairs learners with industry experts using deep personality and skill alignment, and schedules micro‑sessions via a conversational AI scheduler.",
+    "probability": 0.03
+  },
+  {
+    "topic": "AI education",
+    "idea": "AI‑driven learning analytics for K‑12 that audits classroom content for bias, predicts dropout risk, and recommends targeted interventions, all delivered through a teacher dashboard.",
+    "probability": 0.02
+  },
+  {
+    "topic": "AI fintech",
+    "idea": "AI-driven micro-asset allocation platform tailored for gig economy workers, automatically rebalancing portfolios based on real-time earnings and tax obligations.",
+    "probability": 0.04
+  },
+  {
+    "topic": "AI fintech",
+    "idea": "AI-powered regulatory compliance audit engine for crypto exchanges, continuously scanning smart contracts and transaction flows to flag AML/KYC violations before they trigger fines.",
+    "probability": 0.04
+  },
+  {
+    "topic": "AI fintech",
+    "idea": "AI-based dynamic credit scoring platform that aggregates alternative data (utility payments, subscription services, social media sentiment) to provide instant credit limits for underserved SMEs.",
+    "probability": 0.04
+  },
+  {
+    "topic": "AI fintech",
+    "idea": "AI-enabled real‑time fraud detection system for cross‑border remittances, using behavioral biometrics and transaction pattern analysis to flag suspicious transfers instantly.",
+    "probability": 0.04
+  },
+  {
+    "topic": "AI fintech",
+    "idea": "AI-driven personalized financial wellness coaching integrated into wearable ecosystems, delivering micro‑learning, budgeting nudges, and investment suggestions based on biometric and spending data.",
+    "probability": 0.04
+  },
+  {
+    "topic": "AI marketplaces",
+    "idea": "AI Marketplace for Micro-credentialing AI Models – a platform where developers can package and sell fine-tuned models for niche industry tasks (e.g., legal document classification, medical image segmentation).",
+    "probability": 0.02
+  },
+  {
+    "topic": "AI marketplaces",
+    "idea": "Synthetic Data Marketplace for Regulated Industries – a curated marketplace where vetted synthetic data generators sell datasets that comply with GDPR, HIPAA, and other regulations.",
+    "probability": 0.03
+  },
+  {
+    "topic": "AI marketplaces",
+    "idea": "Explainable AI Trading Strategy Exchange – a marketplace where algorithmic traders publish and license AI trading strategies with built‑in explainability dashboards.",
+    "probability": 0.02
+  },
+  {
+    "topic": "AI marketplaces",
+    "idea": "AI‑Powered Legal Document Marketplace – a platform offering AI‑generated, jurisdiction‑specific legal templates (contracts, NDAs, compliance docs) that can be customized via a conversational interface.",
+    "probability": 0.01
+  },
+  {
+    "topic": "AI marketplaces",
+    "idea": "Indie Game Asset AI Marketplace – a curated hub where AI models generate game assets (sprites, level layouts, sound effects) on demand for indie developers.",
+    "probability": 0.02
+  },
+  {
+    "topic": "AI marketing",
+    "idea": "AI-driven micro-voice ad personalization for smart home devices",
+    "probability": 0.07
+  },
+  {
+    "topic": "AI marketing",
+    "idea": "AI-powered emotional resonance analysis for live event marketing",
+    "probability": 0.06
+  },
+  {
+    "topic": "AI marketing",
+    "idea": "AI-generated hyperlocal AR marketing experiences for small retailers",
+    "probability": 0.05
+  },
+  {
+    "topic": "AI marketing",
+    "idea": "AI-based predictive churn marketing for SaaS with automated re-engagement content",
+    "probability": 0.04
+  },
+  {
+    "topic": "AI marketing",
+    "idea": "AI-driven influencer authenticity verification and campaign optimization",
+    "probability": 0.03
+  },
+  {
+    "topic": "AI logistics",
+    "idea": "Autonomous drone swarm platform for rapid last‑mile delivery in disaster‑affected regions, leveraging AI for dynamic path planning and obstacle avoidance.",
+    "probability": 0.04
+  },
+  {
+    "topic": "AI logistics",
+    "idea": "AI‑driven predictive maintenance system for cold‑chain logistics, integrating IoT sensors with blockchain‑based audit trails to ensure temperature integrity and regulatory compliance.",
+    "probability": 0.03
+  },
+  {
+    "topic": "AI logistics",
+    "idea": "AI‑powered dynamic routing engine for intermodal freight that optimizes routes in real time based on traffic, weather, and carbon‑emission targets, providing a “green score” for each shipment.",
+    "probability": 0.02
+  },
+  {
+    "topic": "AI logistics",
+    "idea": "AI concierge for autonomous cargo loading/unloading at ports, using computer vision and reinforcement learning to orchestrate robotic cranes and AGVs, reducing turnaround time and human error.",
+    "probability": 0.03
+  },
+  {
+    "topic": "AI logistics",
+    "idea": "Satellite‑image‑driven AI demand forecasting for perishable goods, combining crop yield data, weather patterns, and consumer trends to predict regional demand spikes and optimize inventory.",
+    "probability": 0.04
+  },
+  {
+    "topic": "AI robotics",
+    "idea": "Autonomous micro-robotic swarm for precision agriculture in vertical farms",
+    "probability": 0.02
+  },
+  {
+    "topic": "AI robotics",
+    "idea": "AI-driven soft robotic exoskeleton for elderly in-home care",
+    "probability": 0.02
+  },
+  {
+    "topic": "AI robotics",
+    "idea": "Autonomous underwater robotic inspection for coral reef restoration",
+    "probability": 0.02
+  },
+  {
+    "topic": "AI robotics",
+    "idea": "AI-powered robotic kitchen assistant for high-end restaurants",
+    "probability": 0.02
+  },
+  {
+    "topic": "AI robotics",
+    "idea": "Swarm of micro-robots for targeted drug delivery inside the human body",
+    "probability": 0.02
+  }
+]
