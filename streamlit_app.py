@@ -328,7 +328,7 @@ def main() -> None:
     )
     apply_custom_style()
 
-    st.title("VS Startup Bench Dashboard")
+    st.title("VS Startup Bench Dashboard — by a desperate psychopath aka Prince")
     st.caption("Experiment analytics for diversity in AI startup ideation")
 
     st.markdown("## Live Idea Generator")
