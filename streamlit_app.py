@@ -713,6 +713,206 @@ def main() -> None:
             hide_index=True,
         )
 
+    st.divider()
+    with st.expander("Research Evaluation Roadmap"):
+        st.markdown(
+            """
+### Quick Evaluation (Based on Current System)
+
+The current system likely follows this architecture:
+
+Prompt -> LLM -> startup ideas  
+Probabilities / VS format  
+Display ideas in Streamlit UI
+
+This works well as a **demo application**, but to evolve into a **research-grade evaluation tool**, three additional layers are typically introduced.
+
+---
+
+### Upgrade 1 — Experiment Mode
+
+Instead of only generating ideas from a topic input:
+
+User enters topic -> ideas generated
+
+Introduce a research experiment toggle.
+
+Mode
+
+• Brainstorm Mode  
+• Experiment Mode
+
+Experiment Mode should generate ideas using two prompting strategies:
+
+Direct Prompt  
+Verbalized Sampling Prompt
+
+Then compare them using diversity metrics.
+
+Example outputs:
+
+Direct Prompt Diversity Score  
+VS Prompt Diversity Score  
+Mode Collapse Score
+
+This converts the application from a **generator into an evaluation framework**.
+
+---
+
+### Upgrade 2 — Mode Collapse Visualization
+
+A key research signal in LLM creativity is **mode collapse**.
+
+Mode Collapse Score
+
+Direct Prompting █████████  
+VS Prompting █████
+
+Interpretation:
+
+Lower score = more diverse idea generation.
+
+This visualization communicates the research insight clearly.
+
+---
+
+### Upgrade 3 — Long-Tail Idea Discovery
+
+Highlight semantically unique ideas located far from the center of idea space.
+
+Example long-tail ideas:
+
+AI procurement negotiator for hospitals  
+Autonomous GTM simulation engine  
+AI startup studio for vertical SaaS launches
+
+These ideas represent the **long-tail of the LLM idea distribution**.
+
+---
+
+### Upgrade 4 — Idea Embedding Map
+
+A powerful visualization is a 2D embedding map of generated ideas.
+
+Implementation stack:
+
+sentence-transformers  
+PCA or UMAP  
+Plotly interactive scatter
+
+Clusters typically emerge around categories such as:
+
+AI healthcare  
+AI developer tools  
+AI marketplaces  
+AI agents
+
+This allows exploration of the **idea landscape**.
+
+---
+
+### Upgrade 5 — Dataset Export
+
+Add an export capability.
+
+Download Experiment Dataset
+
+Dataset fields:
+
+ideas  
+probabilities  
+topics  
+embeddings  
+metrics
+
+This converts the project into a **dataset generator for research experiments**.
+
+---
+
+### Upgrade 6 — Research Metrics Panel
+
+A sidebar research panel can display metrics such as:
+
+Total Ideas Generated  
+Unique Idea Clusters  
+Mode Collapse Score  
+Long Tail Discovery Score
+
+This makes the interface resemble a **benchmark dashboard**.
+
+---
+
+### Upgrade 7 — Research Subtitle
+
+To balance the humorous name with research framing:
+
+A Desperate Psychopath's Idea Machine  
+Exploring the Long Tail of AI Startup Ideas
+
+---
+
+### Upgrade 8 — Example Prompt Buttons
+
+Provide quick generation buttons for common domains:
+
+AI Healthcare  
+AI Agents  
+AI Marketplaces  
+AI Devtools  
+AI Consumer Apps
+
+---
+
+### Upgrade 9 — Reproducibility Badge
+
+In the GitHub README include:
+
+Reproducible Experiment
+
+This signals research rigor.
+
+---
+
+### Upgrade 10 — Key Insight
+
+LLMs internally represent a large distribution of startup ideas.
+
+Direct prompting retrieves high-probability ideas.
+
+Verbalized Sampling reveals ideas from the **long tail of the distribution**.
+
+---
+
+### Potential Future Feature
+
+Model comparison experiments.
+
+Run the same experiment across:
+
+GPT-4  
+Claude  
+Gemini
+
+Then compare **Mode Collapse Scores per model**.
+
+---
+
+### Long-Term Vision
+
+This project sits at the intersection of:
+
+LLM evaluation  
+startup ideation  
+creativity metrics
+
+A potential extension is building a:
+
+Startup Idea Search Engine
+
+Effectively a search system for AI-generated startup concepts.
+"""
+        )
+
 
 if __name__ == "__main__":
     main()
