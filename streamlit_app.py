@@ -3,13 +3,14 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 from pathlib import Path
 from typing import Dict, List
 
 import numpy as np
 import pandas as pd
 import streamlit as st
-from openai import OpenAI
+from openai import APIConnectionError, APIError, NotFoundError, OpenAI, RateLimitError
 from sentence_transformers import SentenceTransformer
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
@@ -25,6 +26,12 @@ PARSED_VS_PATH = Path("data/parsed_vs_ideas.json")
 METRICS_PATH = Path("data/diversity_metrics.json")
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 DEFAULT_LIVE_MODEL = "openai/gpt-oss-20b:free"
+FREE_MODEL_FALLBACKS = [
+    "meta-llama/llama-3.2-3b-instruct:free",
+    "google/gemma-3-4b-it:free",
+    "qwen/qwen3-4b:free",
+    "mistralai/mistral-small-3.1-24b-instruct:free",
+]
 
 RESPONSE_BLOCK_RE = re.compile(r"<response>(.*?)</response>", re.DOTALL | re.IGNORECASE)
 TEXT_RE = re.compile(r"<text>(.*?)</text>", re.DOTALL | re.IGNORECASE)
@@ -95,6 +102,63 @@ def _extract_content_from_completion(completion: object) -> str:
     raise RuntimeError("Model returned empty content. Try another free model.")
 
 
+def _model_candidates(preferred_model: str) -> List[str]:
+    candidates: List[str] = []
+    if preferred_model.strip():
+        candidates.append(preferred_model.strip())
+    configured_fallbacks = _get_secret_or_env("OPENAI_MODEL_FALLBACKS")
+    if configured_fallbacks:
+        candidates.extend(
+            model.strip() for model in configured_fallbacks.split(",") if model.strip()
+        )
+    candidates.extend(FREE_MODEL_FALLBACKS)
+
+    deduped: List[str] = []
+    seen = set()
+    for model in candidates:
+        if model not in seen:
+            deduped.append(model)
+            seen.add(model)
+    return deduped
+
+
+def _create_completion_with_fallback(
+    client: OpenAI,
+    *,
+    preferred_model: str,
+    system_message: str,
+    prompt: str,
+    retries_per_model: int = 1,
+) -> object:
+    last_error: Exception | None = None
+    for model in _model_candidates(preferred_model):
+        for attempt in range(retries_per_model + 1):
+            try:
+                return client.chat.completions.create(
+                    model=model,
+                    temperature=0.9,
+                    messages=[
+                        {"role": "system", "content": system_message},
+                        {"role": "user", "content": prompt},
+                    ],
+                )
+            except NotFoundError as exc:
+                last_error = exc
+                break
+            except (RateLimitError, APIConnectionError, APIError) as exc:
+                last_error = exc
+                if attempt < retries_per_model:
+                    time.sleep(1.5 * (attempt + 1))
+                else:
+                    break
+            except Exception as exc:  # noqa: BLE001
+                last_error = exc
+                break
+    raise RuntimeError(
+        f"All model candidates failed. Last error: {last_error}"
+    ) from last_error
+
+
 def parse_live_response(raw_output: str) -> pd.DataFrame:
     rows: List[Dict[str, object]] = []
     blocks = RESPONSE_BLOCK_RE.findall(raw_output)
@@ -154,13 +218,11 @@ Rules:
 - no markdown or additional commentary
 """.strip()
 
-    completion = client.chat.completions.create(
-        model=model,
-        temperature=0.9,
-        messages=[
-            {"role": "system", "content": "You are an expert AI startup strategist."},
-            {"role": "user", "content": prompt},
-        ],
+    completion = _create_completion_with_fallback(
+        client,
+        preferred_model=model,
+        system_message="You are an expert AI startup strategist.",
+        prompt=prompt,
     )
 
     raw_output = _extract_content_from_completion(completion)
@@ -218,13 +280,11 @@ Rules:
 """.strip()
         system_message = "You are an expert AI startup strategist."
 
-    completion = client.chat.completions.create(
-        model=model,
-        temperature=0.9,
-        messages=[
-            {"role": "system", "content": system_message},
-            {"role": "user", "content": prompt},
-        ],
+    completion = _create_completion_with_fallback(
+        client,
+        preferred_model=model,
+        system_message=system_message,
+        prompt=prompt,
     )
 
     raw_output = _extract_content_from_completion(completion)
@@ -364,8 +424,30 @@ def apply_custom_style() -> None:
             max-width: 1200px;
         }
 
-        .stMarkdown, .stTextInput, .stSlider, .stDataFrame, .stCaption {
-            color: var(--text-main) !important;
+        label[data-testid="stWidgetLabel"] p {
+            color: #e5e7eb !important;
+            font-weight: 600 !important;
+        }
+
+        div[data-baseweb="input"] input,
+        div[data-baseweb="textarea"] textarea {
+            color: #f8fafc !important;
+            -webkit-text-fill-color: #f8fafc !important;
+        }
+
+        div[data-baseweb="input"] {
+            background-color: #0f172a !important;
+            border-color: #334155 !important;
+        }
+
+        button[kind="secondaryFormSubmit"] {
+            color: #ffffff !important;
+            border-color: #475569 !important;
+            background: #1e293b !important;
+        }
+
+        [data-testid="stCaptionContainer"], small, .stCaption, .stMarkdown p {
+            color: #cbd5e1 !important;
         }
 
         .subtle {
