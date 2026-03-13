@@ -361,7 +361,7 @@ def main() -> None:
         model_default = _get_secret_or_env("OPENAI_MODEL") or DEFAULT_MODEL
 
     st.markdown("## Live Experiment Generator")
-    st.caption("`Experiment Mode` generates both Direct and Verbalized Sampling ideas.")
+    st.caption("Deadline mode: generation is enforced as Direct 5 + VS 5 for reliability.")
     if mode_ui == "Brainstorm Mode":
         st.warning(
             "Brainstorm Mode runs Direct prompting only. Switch to Experiment Mode for Direct + VS."
@@ -383,15 +383,19 @@ def main() -> None:
     elif not topic.strip():
         st.warning("Topic is required.")
     else:
+        # Force consistent behavior near deadline: always run both methods with 5 outputs each.
+        if n_ideas != 5:
+            st.info("Using fixed value: 5 ideas per method (deadline reliability mode).")
+        n_ideas = 5
+
         with st.spinner("Generating ideas..."):
             try:
                 direct_ideas, direct_raw = generate_ideas(topic, "direct", model, n=n_ideas)
                 vs_ideas: List[str] = []
                 vs_raw = ""
-                if mode_ui == "Experiment Mode":
-                    vs_ideas, vs_raw = generate_ideas(
-                        topic, "verbalized_sampling", model, n=n_ideas
-                    )
+                vs_ideas, vs_raw = generate_ideas(
+                    topic, "verbalized_sampling", model, n=n_ideas
+                )
             except Exception as exc:  # noqa: BLE001
                 st.error(f"Generation failed: {exc}")
                 st.caption(
@@ -403,108 +407,94 @@ def main() -> None:
                         f"Direct parsing returned {len(direct_ideas)}/{n_ideas} ideas. "
                         "Model format was inconsistent; retry for fuller output."
                     )
-                if mode_ui == "Experiment Mode" and len(vs_ideas) < n_ideas:
+                if len(vs_ideas) < n_ideas:
                     st.warning(
                         f"VS parsing returned {len(vs_ideas)}/{n_ideas} ideas. "
                         "Model format was inconsistent; retry for fuller output."
                     )
-                if mode_ui == "Brainstorm Mode":
-                    st.success(f"Generated {len(direct_ideas)} ideas.")
-                    st.dataframe(
-                        pd.DataFrame({"idea": direct_ideas}),
-                        use_container_width=True,
-                        hide_index=True,
-                    )
-                    emb = compute_embeddings(direct_ideas)
-                    long_tail = get_long_tail_ideas(direct_ideas, emb, top_k=5)
-                    st.markdown("### 🔥 Long Tail Ideas Discovered")
-                    st.dataframe(long_tail, use_container_width=True, hide_index=True)
-                    st.markdown("### 🌌 Startup Idea Universe")
-                    st.plotly_chart(plot_idea_map(direct_ideas, emb), use_container_width=True)
-                else:
-                    direct_emb = compute_embeddings(direct_ideas)
-                    vs_emb = compute_embeddings(vs_ideas)
-                    d_score = mode_collapse_score(direct_emb)
-                    v_score = mode_collapse_score(vs_emb)
-                    c1, c2 = st.columns(2)
-                    c1.metric("Direct Mode Collapse", f"{d_score:.4f}")
-                    c2.metric("VS Mode Collapse", f"{v_score:.4f}")
-                    st.plotly_chart(
-                        px.bar(
-                            pd.DataFrame(
-                                {
-                                    "method": ["Direct", "Verbalized Sampling"],
-                                    "score": [d_score, v_score],
-                                }
-                            ),
-                            x="method",
-                            y="score",
-                            title="Mode Collapse Score (lower is better)",
+                direct_emb = compute_embeddings(direct_ideas)
+                vs_emb = compute_embeddings(vs_ideas)
+                d_score = mode_collapse_score(direct_emb)
+                v_score = mode_collapse_score(vs_emb)
+                c1, c2 = st.columns(2)
+                c1.metric("Direct Mode Collapse", f"{d_score:.4f}")
+                c2.metric("VS Mode Collapse", f"{v_score:.4f}")
+                st.plotly_chart(
+                    px.bar(
+                        pd.DataFrame(
+                            {
+                                "method": ["Direct", "Verbalized Sampling"],
+                                "score": [d_score, v_score],
+                            }
                         ),
-                        use_container_width=True,
-                    )
+                        x="method",
+                        y="score",
+                        title="Mode Collapse Score (lower is better)",
+                    ),
+                    use_container_width=True,
+                )
 
-                    st.markdown("### Direct Prompting")
-                    st.dataframe(
-                        pd.DataFrame({"idea": direct_ideas}),
-                        use_container_width=True,
-                        hide_index=True,
-                    )
-                    st.markdown("### Verbalized Sampling")
-                    st.dataframe(
-                        pd.DataFrame({"idea": vs_ideas}),
-                        use_container_width=True,
-                        hide_index=True,
-                    )
+                st.markdown("### Direct Prompting")
+                st.dataframe(
+                    pd.DataFrame({"idea": direct_ideas}),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+                st.markdown("### Verbalized Sampling")
+                st.dataframe(
+                    pd.DataFrame({"idea": vs_ideas}),
+                    use_container_width=True,
+                    hide_index=True,
+                )
 
-                    combined_ideas = direct_ideas + vs_ideas
-                    combined_emb = compute_embeddings(combined_ideas)
-                    st.markdown("### 🔥 Long Tail Ideas Discovered")
-                    st.dataframe(
-                        get_long_tail_ideas(combined_ideas, combined_emb, top_k=5),
-                        use_container_width=True,
-                        hide_index=True,
-                    )
-                    st.markdown("### 🌌 Startup Idea Universe")
-                    st.plotly_chart(
-                        plot_idea_map(combined_ideas, combined_emb),
-                        use_container_width=True,
-                    )
+                combined_ideas = direct_ideas + vs_ideas
+                combined_emb = compute_embeddings(combined_ideas)
+                st.markdown("### 🔥 Long Tail Ideas Discovered")
+                st.dataframe(
+                    get_long_tail_ideas(combined_ideas, combined_emb, top_k=5),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+                st.markdown("### 🌌 Startup Idea Universe")
+                st.plotly_chart(
+                    plot_idea_map(combined_ideas, combined_emb),
+                    use_container_width=True,
+                )
 
-                    rows = []
-                    now = datetime.now(timezone.utc).isoformat()
-                    for i, idea in enumerate(direct_ideas):
-                        rows.append(
-                            {
-                                "topic": topic,
-                                "idea": idea,
-                                "method": "direct",
-                                "embedding": direct_emb[i].tolist() if len(direct_emb) > i else [],
-                                "timestamp": now,
-                            }
-                        )
-                    for i, idea in enumerate(vs_ideas):
-                        rows.append(
-                            {
-                                "topic": topic,
-                                "idea": idea,
-                                "method": "verbalized_sampling",
-                                "embedding": vs_emb[i].tolist() if len(vs_emb) > i else [],
-                                "timestamp": now,
-                            }
-                        )
-                    st.download_button(
-                        "Download Experiment Dataset",
-                        data=json.dumps(rows, indent=2),
-                        file_name="experiment_dataset.json",
-                        mime="application/json",
+                rows = []
+                now = datetime.now(timezone.utc).isoformat()
+                for i, idea in enumerate(direct_ideas):
+                    rows.append(
+                        {
+                            "topic": topic,
+                            "idea": idea,
+                            "method": "direct",
+                            "embedding": direct_emb[i].tolist() if len(direct_emb) > i else [],
+                            "timestamp": now,
+                        }
                     )
+                for i, idea in enumerate(vs_ideas):
+                    rows.append(
+                        {
+                            "topic": topic,
+                            "idea": idea,
+                            "method": "verbalized_sampling",
+                            "embedding": vs_emb[i].tolist() if len(vs_emb) > i else [],
+                            "timestamp": now,
+                        }
+                    )
+                st.download_button(
+                    "Download Experiment Dataset",
+                    data=json.dumps(rows, indent=2),
+                    file_name="experiment_dataset.json",
+                    mime="application/json",
+                )
 
-                    with st.expander("Raw model outputs"):
-                        st.markdown("#### Direct")
-                        st.code(direct_raw)
-                        st.markdown("#### Verbalized Sampling")
-                        st.code(vs_raw)
+                with st.expander("Raw model outputs"):
+                    st.markdown("#### Direct")
+                    st.code(direct_raw)
+                    st.markdown("#### Verbalized Sampling")
+                    st.code(vs_raw)
 
     st.divider()
     st.markdown("## Existing Dataset Dashboard")
