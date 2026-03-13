@@ -32,15 +32,15 @@ from dashboard.research_utils import (
 PARSED_VS_PATH = Path("data/parsed_vs_ideas.json")
 METRICS_PATH = Path("data/diversity_metrics.json")
 DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
-DEFAULT_MODEL = "nvidia/nemotron-3-nano-30b-a3b:free"
+DEFAULT_MODEL = "mistralai/mistral-small-3.1-24b-instruct:free"
 FREE_MODEL_FALLBACKS = [
-    "nvidia/nemotron-3-super-120b-a12b:free",
-    "google/gemma-3-4b-it:free",
     "qwen/qwen3-4b:free",
-    "mistralai/mistral-small-3.1-24b-instruct:free",
+    "nvidia/nemotron-3-nano-30b-a3b:free",
+    "google/gemma-3-4b-it:free",
+    "nvidia/nemotron-3-super-120b-a12b:free",
 ]
 KIMI_MODEL = "moonshotai/kimi-k2"
-UI_STATE_VERSION = "v3"
+UI_STATE_VERSION = "v4"
 
 RESPONSE_BLOCK_RE = re.compile(r"<response>(.*?)</response>", re.DOTALL | re.IGNORECASE)
 TEXT_RE = re.compile(r"<text>(.*?)</text>", re.DOTALL | re.IGNORECASE)
@@ -110,15 +110,22 @@ def _client() -> OpenAI:
     return OpenAI(api_key=api_key, base_url=base_url)
 
 
-def _chat_with_fallback(model: str, system: str, prompt: str) -> str:
+def _chat_with_fallback(
+    model: str,
+    system: str,
+    prompt: str,
+    *,
+    temperature: float = 0.7,
+) -> str:
     client = _client()
     last_error: Exception | None = None
     for candidate in _model_candidates(model):
-        for attempt in range(2):
+        for attempt in range(3):
             try:
                 completion = client.chat.completions.create(
                     model=candidate,
-                    temperature=0.9,
+                    temperature=temperature,
+                    max_tokens=1400,
                     messages=[
                         {"role": "system", "content": system},
                         {"role": "user", "content": prompt},
@@ -130,7 +137,7 @@ def _chat_with_fallback(model: str, system: str, prompt: str) -> str:
                 break
             except (RateLimitError, APIConnectionError, APIError) as exc:
                 last_error = exc
-                time.sleep(1.5 * (attempt + 1))
+                time.sleep(1.2 * (attempt + 1))
             except Exception as exc:  # noqa: BLE001
                 last_error = exc
                 break
@@ -197,7 +204,12 @@ def generate_ideas(topic: str, mode: str, model: str, n: int = 10) -> tuple[List
             "<response><text>...</text><probability>0.01</probability></response>"
         )
         system = "You generate clear practical startup ideas."
-    raw = _chat_with_fallback(model, system, prompt)
+    raw = _chat_with_fallback(
+        model,
+        system,
+        prompt,
+        temperature=0.85 if mode == "verbalized_sampling" else 0.6,
+    )
     ideas = _parse_ideas(raw, limit=n)
 
     # Free models sometimes ignore XML formatting; run one repair pass if too few ideas.
@@ -211,6 +223,7 @@ def generate_ideas(topic: str, mode: str, model: str, n: int = 10) -> tuple[List
             model,
             "You are a strict output formatter.",
             repair_prompt,
+            temperature=0.2,
         )
         repaired_ideas = _parse_ideas(repaired_raw, limit=n)
         if len(repaired_ideas) > len(ideas):
@@ -331,14 +344,17 @@ def main() -> None:
     preset = st.sidebar.selectbox(
         "Model preset",
         [
-            "NVIDIA free (recommended)",
+            "Mistral free (recommended)",
+            "NVIDIA free (fast fallback)",
             "Kimi (requires your access)",
             "Custom model",
         ],
         key=f"model_preset_{UI_STATE_VERSION}",
     )
-    if preset == "NVIDIA free (recommended)":
+    if preset == "Mistral free (recommended)":
         model_default = DEFAULT_MODEL
+    elif preset == "NVIDIA free (fast fallback)":
+        model_default = "nvidia/nemotron-3-nano-30b-a3b:free"
     elif preset == "Kimi (requires your access)":
         model_default = KIMI_MODEL
     else:
@@ -379,7 +395,7 @@ def main() -> None:
             except Exception as exc:  # noqa: BLE001
                 st.error(f"Generation failed: {exc}")
                 st.caption(
-                    "Tip: NVIDIA free models are available now. Kimi may not be free/available on every account."
+                    "Tip: use Mistral free recommended preset for more consistent formatting."
                 )
             else:
                 if len(direct_ideas) < n_ideas:
