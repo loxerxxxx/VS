@@ -58,6 +58,43 @@ def _extract_line_value(pattern: re.Pattern[str], text: str) -> str:
     return ""
 
 
+def _extract_content_from_completion(completion: object) -> str:
+    """Safely read text content from provider response variants."""
+    choices = getattr(completion, "choices", None)
+    if not choices:
+        raise RuntimeError("Model returned no choices. Please retry or switch model.")
+
+    first = choices[0] if len(choices) > 0 else None
+    if first is None:
+        raise RuntimeError("Model returned an empty first choice. Please retry.")
+
+    message = getattr(first, "message", None)
+    if message is None:
+        raise RuntimeError("Model response is missing message content. Please retry.")
+
+    content = getattr(message, "content", None)
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, dict):
+                parts.append(str(item.get("text", "")))
+            else:
+                text = getattr(item, "text", "")
+                if text:
+                    parts.append(str(text))
+        joined = "\n".join(part for part in parts if part).strip()
+        if joined:
+            return joined
+
+    # Fallback for provider/tool outputs where content is empty but object exists.
+    alt = str(message).strip()
+    if alt:
+        return alt
+    raise RuntimeError("Model returned empty content. Try another free model.")
+
+
 def parse_live_response(raw_output: str) -> pd.DataFrame:
     rows: List[Dict[str, object]] = []
     blocks = RESPONSE_BLOCK_RE.findall(raw_output)
@@ -126,7 +163,7 @@ Rules:
         ],
     )
 
-    raw_output = (completion.choices[0].message.content or "").strip()
+    raw_output = _extract_content_from_completion(completion)
     return raw_output, parse_live_response(raw_output)
 
 
@@ -190,7 +227,7 @@ Rules:
         ],
     )
 
-    raw_output = (completion.choices[0].message.content or "").strip()
+    raw_output = _extract_content_from_completion(completion)
     return raw_output, parse_live_response(raw_output)
 
 
