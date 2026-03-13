@@ -32,11 +32,12 @@ from dashboard.research_utils import (
 PARSED_VS_PATH = Path("data/parsed_vs_ideas.json")
 METRICS_PATH = Path("data/diversity_metrics.json")
 DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
-DEFAULT_MODEL = "openai/gpt-oss-20b:free"
+DEFAULT_MODEL = "gpt-4o-mini"
 FREE_MODEL_FALLBACKS = [
+    "gpt-4o",
     "openai/gpt-oss-20b:free",
-    "qwen/qwen3-4b:free",
     "mistralai/mistral-small-3.1-24b-instruct:free",
+    "qwen/qwen3-4b:free",
 ]
 KIMI_MODEL = "moonshotai/kimi-k2"
 UI_STATE_VERSION = "v4"
@@ -445,14 +446,14 @@ def main() -> None:
     preset = st.sidebar.selectbox(
         "Model preset",
         [
-            "GPT-OSS-20B free (recommended)",
+            "OpenAI gpt-4o-mini (research-safe)",
             "NVIDIA free (fast fallback)",
             "Kimi (requires your access)",
             "Custom model",
         ],
         key=f"model_preset_{UI_STATE_VERSION}",
     )
-    if preset == "GPT-OSS-20B free (recommended)":
+    if preset == "OpenAI gpt-4o-mini (research-safe)":
         model_default = DEFAULT_MODEL
     elif preset == "NVIDIA free (fast fallback)":
         model_default = "nvidia/nemotron-3-nano-30b-a3b:free"
@@ -506,7 +507,7 @@ def main() -> None:
                         "or add a paid key/provider for faster and more stable generation."
                     )
                 st.caption(
-                    "Tip: use GPT-OSS-20B free recommended preset for consistent free-tier behavior."
+                    "Tip: use OpenAI gpt-4o-mini (research-safe) for stable Direct vs VS comparison."
                 )
             else:
                 if len(direct_ideas) < n_ideas:
