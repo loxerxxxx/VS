@@ -32,12 +32,11 @@ from dashboard.research_utils import (
 PARSED_VS_PATH = Path("data/parsed_vs_ideas.json")
 METRICS_PATH = Path("data/diversity_metrics.json")
 DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
-DEFAULT_MODEL = "mistralai/mistral-small-3.1-24b-instruct:free"
+DEFAULT_MODEL = "openai/gpt-oss-20b:free"
 FREE_MODEL_FALLBACKS = [
+    "openai/gpt-oss-20b:free",
     "qwen/qwen3-4b:free",
-    "nvidia/nemotron-3-nano-30b-a3b:free",
-    "google/gemma-3-4b-it:free",
-    "nvidia/nemotron-3-super-120b-a12b:free",
+    "mistralai/mistral-small-3.1-24b-instruct:free",
 ]
 KIMI_MODEL = "moonshotai/kimi-k2"
 UI_STATE_VERSION = "v4"
@@ -446,14 +445,14 @@ def main() -> None:
     preset = st.sidebar.selectbox(
         "Model preset",
         [
-            "Mistral free (recommended)",
+            "GPT-OSS-20B free (recommended)",
             "NVIDIA free (fast fallback)",
             "Kimi (requires your access)",
             "Custom model",
         ],
         key=f"model_preset_{UI_STATE_VERSION}",
     )
-    if preset == "Mistral free (recommended)":
+    if preset == "GPT-OSS-20B free (recommended)":
         model_default = DEFAULT_MODEL
     elif preset == "NVIDIA free (fast fallback)":
         model_default = "nvidia/nemotron-3-nano-30b-a3b:free"
@@ -496,13 +495,18 @@ def main() -> None:
                 )
             except Exception as exc:  # noqa: BLE001
                 st.error(f"Generation failed: {exc}")
+                if "spend limit exceeded" in str(exc).lower() or "error code: 402" in str(exc).lower():
+                    st.info(
+                        "Provider spend cap reached (402). Update OpenRouter key spend limit "
+                        "or use another key/provider route."
+                    )
                 if "Rate limit exceeded" in str(exc):
                     st.info(
                         "Free-tier limit reached. Quick options: wait for reset and retry, "
                         "or add a paid key/provider for faster and more stable generation."
                     )
                 st.caption(
-                    "Tip: use Mistral free recommended preset for more consistent formatting."
+                    "Tip: use GPT-OSS-20B free recommended preset for consistent free-tier behavior."
                 )
             else:
                 if len(direct_ideas) < n_ideas:
