@@ -106,6 +106,45 @@ def _model_candidates(model: str) -> List[str]:
     return deduped
 
 
+def _max_model_candidates() -> int:
+    raw = _get_secret_or_env("OPENAI_MAX_MODEL_CANDIDATES")
+    if raw:
+        try:
+            return max(1, int(raw))
+        except ValueError:
+            return 1
+    # Free-tier safe default: avoid broad probing that triggers rate limits.
+    return 1
+
+
+def _max_attempts_per_model() -> int:
+    raw = _get_secret_or_env("OPENAI_MAX_ATTEMPTS_PER_MODEL")
+    if raw:
+        try:
+            return max(1, int(raw))
+        except ValueError:
+            return 1
+    # Free-tier safe default.
+    return 1
+
+
+def _format_rate_limit_error(exc: Exception) -> str:
+    text = str(exc)
+    reset_match = re.search(r"X-RateLimit-Reset':\s*'(\d+)'", text)
+    if reset_match:
+        try:
+            reset_ms = int(reset_match.group(1))
+            reset_dt = datetime.fromtimestamp(reset_ms / 1000, tz=timezone.utc).astimezone()
+            reset_str = reset_dt.strftime("%Y-%m-%d %H:%M:%S %Z")
+            return (
+                "Rate limit exceeded for free models. "
+                f"Retry after {reset_str}."
+            )
+        except Exception:  # noqa: BLE001
+            pass
+    return "Rate limit exceeded for free models. Please wait about a minute and retry."
+
+
 def _client() -> OpenAI:
     api_key = _get_secret_or_env("OPENAI_API_KEY")
     if not api_key:
@@ -140,8 +179,9 @@ def _chat_with_fallback_using_client(
     temperature: float = 0.7,
 ) -> str:
     last_error: Exception | None = None
-    for candidate in _model_candidates(model):
-        for attempt in range(3):
+    candidates = _model_candidates(model)[: _max_model_candidates()]
+    for candidate in candidates:
+        for attempt in range(_max_attempts_per_model()):
             try:
                 completion = client.chat.completions.create(
                     model=candidate,
@@ -156,7 +196,10 @@ def _chat_with_fallback_using_client(
             except NotFoundError as exc:
                 last_error = exc
                 break
-            except (RateLimitError, APIConnectionError, APIError) as exc:
+            except RateLimitError as exc:
+                # Fail fast on global free-tier limits to avoid long spinner loops.
+                raise RuntimeError(_format_rate_limit_error(exc)) from exc
+            except (APIConnectionError, APIError) as exc:
                 last_error = exc
                 time.sleep(1.2 * (attempt + 1))
             except Exception as exc:  # noqa: BLE001
@@ -250,7 +293,8 @@ def generate_ideas(topic: str, mode: str, model: str, n: int = 10) -> tuple[List
     last_error: Exception | None = None
 
     # Try model candidates until one produces the requested count.
-    for candidate in _model_candidates(model):
+    candidates = _model_candidates(model)[: _max_model_candidates()]
+    for candidate in candidates:
         try:
             raw = _chat_with_fallback_using_client(
                 client,
@@ -452,6 +496,11 @@ def main() -> None:
                 )
             except Exception as exc:  # noqa: BLE001
                 st.error(f"Generation failed: {exc}")
+                if "Rate limit exceeded" in str(exc):
+                    st.info(
+                        "Free-tier limit reached. Quick options: wait for reset and retry, "
+                        "or add a paid key/provider for faster and more stable generation."
+                    )
                 st.caption(
                     "Tip: use Mistral free recommended preset for more consistent formatting."
                 )
