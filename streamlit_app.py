@@ -398,12 +398,7 @@ def main() -> None:
     st.markdown('<div class="hero-title">VS STARTUP BENCH DASHBOARD</div>', unsafe_allow_html=True)
     st.markdown('<div class="hero-sub">BY A DESPERATE PSYCHOPATH AKA PRINCE</div>', unsafe_allow_html=True)
 
-    mode_ui = st.sidebar.selectbox(
-        "Mode",
-        ["Brainstorm Mode", "Experiment Mode"],
-        index=1,
-        key=f"mode_{UI_STATE_VERSION}",
-    )
+    st.sidebar.markdown("**Mode: Experiment (Direct + VS)**")
     preset = st.sidebar.selectbox(
         "Model preset",
         [
@@ -424,11 +419,7 @@ def main() -> None:
         model_default = _get_secret_or_env("OPENAI_MODEL") or DEFAULT_MODEL
 
     st.markdown("## Live Experiment Generator")
-    st.caption("Deadline mode: generation is enforced as Direct 5 + VS 5 for reliability.")
-    if mode_ui == "Brainstorm Mode":
-        st.warning(
-            "Brainstorm Mode runs Direct prompting only. Switch to Experiment Mode for Direct + VS."
-        )
+    st.caption("Experiment mode runs Direct + VS with 5 ideas each for reliability.")
     with st.form("generate_form"):
         topic = st.text_input("Topic", value="AI healthcare", key=f"topic_{UI_STATE_VERSION}")
         n_ideas = st.slider(
