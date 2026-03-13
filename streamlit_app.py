@@ -43,6 +43,10 @@ KIMI_MODEL = "moonshotai/kimi-k2"
 
 RESPONSE_BLOCK_RE = re.compile(r"<response>(.*?)</response>", re.DOTALL | re.IGNORECASE)
 TEXT_RE = re.compile(r"<text>(.*?)</text>", re.DOTALL | re.IGNORECASE)
+LIST_ITEM_RE = re.compile(
+    r"(?:^|\n)\s*(?:\d+[\).:-]|[-*•])\s+(.+?)(?=(?:\n\s*(?:\d+[\).:-]|[-*•])\s+)|\Z)",
+    re.DOTALL,
+)
 
 
 def _load_json(path: Path):
@@ -132,20 +136,48 @@ def _chat_with_fallback(model: str, system: str, prompt: str) -> str:
     raise RuntimeError(f"All model attempts failed. Last error: {last_error}")
 
 
-def _parse_ideas(raw: str) -> List[str]:
+def _normalize_idea(text: str) -> str:
+    cleaned = re.sub(r"</?[^>]+>", " ", text)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned
+
+
+def _dedupe_keep_order(items: List[str]) -> List[str]:
+    out: List[str] = []
+    seen = set()
+    for item in items:
+        key = item.lower().strip()
+        if key and key not in seen:
+            out.append(item.strip())
+            seen.add(key)
+    return out
+
+
+def _parse_ideas(raw: str, limit: int = 10) -> List[str]:
     ideas: List[str] = []
     blocks = RESPONSE_BLOCK_RE.findall(raw)
     if blocks:
         for block in blocks:
             match = TEXT_RE.search(block)
             if match:
-                txt = match.group(1).strip()
+                txt = _normalize_idea(match.group(1))
                 if txt:
                     ideas.append(txt)
-    if ideas:
-        return ideas
-    lines = [line.strip("- ").strip() for line in raw.splitlines() if line.strip()]
-    return lines[:10]
+
+    if not ideas:
+        list_items = [_normalize_idea(m.group(1)) for m in LIST_ITEM_RE.finditer(raw)]
+        ideas.extend(x for x in list_items if x)
+
+    if not ideas:
+        paras = [_normalize_idea(p) for p in re.split(r"\n\s*\n+", raw) if p.strip()]
+        ideas.extend(x for x in paras if x and len(x.split()) > 3)
+
+    if not ideas:
+        lines = [_normalize_idea(line.strip("- ").strip()) for line in raw.splitlines() if line.strip()]
+        ideas.extend(x for x in lines if x)
+
+    ideas = _dedupe_keep_order(ideas)
+    return ideas[:limit]
 
 
 def generate_ideas(topic: str, mode: str, model: str, n: int = 10) -> tuple[List[str], str]:
@@ -165,7 +197,25 @@ def generate_ideas(topic: str, mode: str, model: str, n: int = 10) -> tuple[List
         )
         system = "You generate clear practical startup ideas."
     raw = _chat_with_fallback(model, system, prompt)
-    return _parse_ideas(raw), raw
+    ideas = _parse_ideas(raw, limit=n)
+
+    # Free models sometimes ignore XML formatting; run one repair pass if too few ideas.
+    if len(ideas) < n:
+        repair_prompt = (
+            f"Convert the content below into exactly {n} distinct startup ideas. "
+            "Output one idea per line, no numbering, no markdown.\n\n"
+            f"CONTENT:\n{raw}"
+        )
+        repaired_raw = _chat_with_fallback(
+            model,
+            "You are a strict output formatter.",
+            repair_prompt,
+        )
+        repaired_ideas = _parse_ideas(repaired_raw, limit=n)
+        if len(repaired_ideas) > len(ideas):
+            ideas = repaired_ideas
+
+    return ideas, raw
 
 
 @st.cache_data
@@ -271,7 +321,7 @@ def main() -> None:
     st.markdown('<div class="hero-title">VS STARTUP BENCH DASHBOARD</div>', unsafe_allow_html=True)
     st.markdown('<div class="hero-sub">BY A DESPERATE PSYCHOPATH AKA PRINCE</div>', unsafe_allow_html=True)
 
-    mode_ui = st.sidebar.selectbox("Mode", ["Brainstorm Mode", "Experiment Mode"])
+    mode_ui = st.sidebar.selectbox("Mode", ["Brainstorm Mode", "Experiment Mode"], index=1)
     preset = st.sidebar.selectbox(
         "Model preset",
         [
@@ -288,9 +338,10 @@ def main() -> None:
         model_default = _get_secret_or_env("OPENAI_MODEL") or DEFAULT_MODEL
 
     st.markdown("## Live Experiment Generator")
+    st.caption("`Experiment Mode` generates both Direct and Verbalized Sampling ideas.")
     with st.form("generate_form"):
         topic = st.text_input("Topic", value="AI healthcare")
-        n_ideas = st.slider("Ideas per method", min_value=5, max_value=15, value=10)
+        n_ideas = st.slider("Ideas per method", min_value=5, max_value=15, value=5)
         model = st.text_input("Model", value=model_default)
         submitted = st.form_submit_button("Generate")
 
@@ -314,6 +365,16 @@ def main() -> None:
                     "Tip: NVIDIA free models are available now. Kimi may not be free/available on every account."
                 )
             else:
+                if len(direct_ideas) < n_ideas:
+                    st.warning(
+                        f"Direct parsing returned {len(direct_ideas)}/{n_ideas} ideas. "
+                        "Model format was inconsistent; retry for fuller output."
+                    )
+                if mode_ui == "Experiment Mode" and len(vs_ideas) < n_ideas:
+                    st.warning(
+                        f"VS parsing returned {len(vs_ideas)}/{n_ideas} ideas. "
+                        "Model format was inconsistent; retry for fuller output."
+                    )
                 if mode_ui == "Brainstorm Mode":
                     st.success(f"Generated {len(direct_ideas)} ideas.")
                     st.dataframe(
