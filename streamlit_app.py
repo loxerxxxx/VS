@@ -298,21 +298,85 @@ def apply_custom_style() -> None:
     st.markdown(
         """
         <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Teko:wght@500;600;700&display=swap');
+
+        :root {
+            --bg-main: #060816;
+            --bg-panel: #0f172a;
+            --bg-panel-soft: #101a31;
+            --text-main: #e5e7eb;
+            --text-muted: #9ca3af;
+            --accent-1: #4f46e5;
+            --accent-2: #06b6d4;
+            --accent-3: #f43f5e;
+            --border: #25314f;
+        }
+
+        .stApp {
+            background:
+                radial-gradient(1200px 600px at 20% -10%, rgba(79, 70, 229, 0.24), transparent 60%),
+                radial-gradient(1000px 500px at 90% 0%, rgba(6, 182, 212, 0.18), transparent 55%),
+                linear-gradient(180deg, #070b1a 0%, var(--bg-main) 100%);
+            color: var(--text-main);
+            font-family: "Inter", system-ui, -apple-system, sans-serif;
+        }
+
         .block-container {
             padding-top: 2rem;
-            padding-bottom: 2rem;
+            padding-bottom: 3rem;
             max-width: 1200px;
         }
-        .metric-card {
-            background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
-            border: 1px solid #374151;
-            border-radius: 12px;
-            padding: 0.8rem 1rem;
-            color: #f9fafb;
+
+        .stMarkdown, .stTextInput, .stSlider, .stDataFrame, .stCaption {
+            color: var(--text-main) !important;
         }
+
         .subtle {
-            color: #6b7280;
+            color: var(--text-muted);
             font-size: 0.95rem;
+        }
+
+        div[data-testid="stVerticalBlock"] > div:has(> div > div > .stMarkdown h2) {
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(10, 15, 30, 0.92));
+            border: 1px solid rgba(37, 49, 79, 0.85);
+            border-radius: 16px;
+            padding: 1rem 1rem 0.5rem 1rem;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.28);
+            backdrop-filter: blur(4px);
+        }
+
+        [data-testid="stMetric"] {
+            background: linear-gradient(135deg, rgba(14, 22, 44, 0.85), rgba(12, 20, 38, 0.9));
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 0.5rem 0.75rem;
+        }
+
+        .hero-title {
+            font-family: "Teko", "Inter", sans-serif;
+            font-size: clamp(2.3rem, 5vw, 4rem);
+            letter-spacing: 0.08em;
+            line-height: 0.95;
+            margin-bottom: 0.15rem;
+            text-transform: uppercase;
+            color: #f8fafc;
+            text-shadow:
+                0 0 24px rgba(79, 70, 229, 0.45),
+                0 0 40px rgba(6, 182, 212, 0.25);
+        }
+
+        .hero-subtitle {
+            color: var(--text-muted);
+            margin-top: 0;
+            margin-bottom: 0.25rem;
+            font-size: 0.95rem;
+        }
+
+        .hero-tag {
+            color: #c7d2fe;
+            font-size: 0.9rem;
+            margin-top: 0;
+            margin-bottom: 1.25rem;
         }
         </style>
         """,
@@ -328,8 +392,14 @@ def main() -> None:
     )
     apply_custom_style()
 
-    st.title("VS Startup Bench Dashboard — by a desperate psychopath aka Prince")
-    st.caption("Experiment analytics for diversity in AI startup ideation")
+    st.markdown(
+        """
+        <div class="hero-title">VS Startup Bench Dashboard</div>
+        <p class="hero-subtitle">Experiment analytics for diversity in AI startup ideation</p>
+        <p class="hero-tag">by a desperate psychopath aka Prince</p>
+        """,
+        unsafe_allow_html=True,
+    )
 
     st.markdown("## Live Idea Generator")
     st.write(
