@@ -40,6 +40,7 @@ FREE_MODEL_FALLBACKS = [
     "mistralai/mistral-small-3.1-24b-instruct:free",
 ]
 KIMI_MODEL = "moonshotai/kimi-k2"
+UI_STATE_VERSION = "v3"
 
 RESPONSE_BLOCK_RE = re.compile(r"<response>(.*?)</response>", re.DOTALL | re.IGNORECASE)
 TEXT_RE = re.compile(r"<text>(.*?)</text>", re.DOTALL | re.IGNORECASE)
@@ -321,7 +322,12 @@ def main() -> None:
     st.markdown('<div class="hero-title">VS STARTUP BENCH DASHBOARD</div>', unsafe_allow_html=True)
     st.markdown('<div class="hero-sub">BY A DESPERATE PSYCHOPATH AKA PRINCE</div>', unsafe_allow_html=True)
 
-    mode_ui = st.sidebar.selectbox("Mode", ["Brainstorm Mode", "Experiment Mode"], index=1)
+    mode_ui = st.sidebar.selectbox(
+        "Mode",
+        ["Brainstorm Mode", "Experiment Mode"],
+        index=1,
+        key=f"mode_{UI_STATE_VERSION}",
+    )
     preset = st.sidebar.selectbox(
         "Model preset",
         [
@@ -329,6 +335,7 @@ def main() -> None:
             "Kimi (requires your access)",
             "Custom model",
         ],
+        key=f"model_preset_{UI_STATE_VERSION}",
     )
     if preset == "NVIDIA free (recommended)":
         model_default = DEFAULT_MODEL
@@ -339,10 +346,20 @@ def main() -> None:
 
     st.markdown("## Live Experiment Generator")
     st.caption("`Experiment Mode` generates both Direct and Verbalized Sampling ideas.")
+    if mode_ui == "Brainstorm Mode":
+        st.warning(
+            "Brainstorm Mode runs Direct prompting only. Switch to Experiment Mode for Direct + VS."
+        )
     with st.form("generate_form"):
-        topic = st.text_input("Topic", value="AI healthcare")
-        n_ideas = st.slider("Ideas per method", min_value=5, max_value=15, value=5)
-        model = st.text_input("Model", value=model_default)
+        topic = st.text_input("Topic", value="AI healthcare", key=f"topic_{UI_STATE_VERSION}")
+        n_ideas = st.slider(
+            "Ideas per method",
+            min_value=5,
+            max_value=15,
+            value=5,
+            key=f"ideas_per_method_{UI_STATE_VERSION}",
+        )
+        model = st.text_input("Model", value=model_default, key=f"model_{UI_STATE_VERSION}")
         submitted = st.form_submit_button("Generate")
 
     if not submitted:
