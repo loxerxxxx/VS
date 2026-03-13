@@ -48,6 +48,10 @@ LIST_ITEM_RE = re.compile(
     r"(?:^|\n)\s*(?:\d+[\).:-]|[-*•])\s+(.+?)(?=(?:\n\s*(?:\d+[\).:-]|[-*•])\s+)|\Z)",
     re.DOTALL,
 )
+INLINE_COMPOUND_ITEM_RE = re.compile(
+    r"(?:^|\s)(?:\d+[\).:-]|[-*•])\s+(.+?)(?=(?:\s(?:\d+[\).:-]|[-*•])\s+)|$)",
+    re.DOTALL,
+)
 
 
 def _load_json(path: Path):
@@ -118,6 +122,23 @@ def _chat_with_fallback(
     temperature: float = 0.7,
 ) -> str:
     client = _client()
+    return _chat_with_fallback_using_client(
+        client,
+        model,
+        system,
+        prompt,
+        temperature=temperature,
+    )
+
+
+def _chat_with_fallback_using_client(
+    client: OpenAI,
+    model: str,
+    system: str,
+    prompt: str,
+    *,
+    temperature: float = 0.7,
+) -> str:
     last_error: Exception | None = None
     for candidate in _model_candidates(model):
         for attempt in range(3):
@@ -161,6 +182,14 @@ def _dedupe_keep_order(items: List[str]) -> List[str]:
     return out
 
 
+def _split_compound_idea(text: str) -> List[str]:
+    parts = [_normalize_idea(m.group(1)) for m in INLINE_COMPOUND_ITEM_RE.finditer(text)]
+    parts = [p for p in parts if p]
+    if len(parts) >= 2:
+        return parts
+    return [text]
+
+
 def _parse_ideas(raw: str, limit: int = 10) -> List[str]:
     ideas: List[str] = []
     blocks = RESPONSE_BLOCK_RE.findall(raw)
@@ -184,6 +213,10 @@ def _parse_ideas(raw: str, limit: int = 10) -> List[str]:
         lines = [_normalize_idea(line.strip("- ").strip()) for line in raw.splitlines() if line.strip()]
         ideas.extend(x for x in lines if x)
 
+    # If a single parsed item contains multiple numbered/bulleted ideas, split it.
+    if len(ideas) == 1:
+        ideas = _split_compound_idea(ideas[0])
+
     ideas = _dedupe_keep_order(ideas)
     return ideas[:limit]
 
@@ -191,45 +224,75 @@ def _parse_ideas(raw: str, limit: int = 10) -> List[str]:
 def generate_ideas(topic: str, mode: str, model: str, n: int = 10) -> tuple[List[str], str]:
     if mode == "verbalized_sampling":
         prompt = (
-            f"Think of 20 possible startup ideas for {topic}. Internally consider the probability "
-            "distribution and sample from unusual/long-tail regions. Return exactly "
-            f"{n} diverse ideas in this XML format only:\n"
-            "<response><text>...</text><probability>0.01</probability></response>"
+            f"Think of 20 startup ideas for {topic}. Sample unusual/long-tail regions.\n"
+            f"Return exactly {n} responses and NOTHING else.\n"
+            "STRICT FORMAT (repeat this block exactly 5 times):\n"
+            "<response><text>[one idea only, single sentence, no numbering]</text>"
+            "<probability>[numeric < 0.10]</probability></response>\n"
+            "Rules: one idea per response block, no combined ideas, no markdown, no prose."
         )
         system = "You generate unconventional but plausible startup ideas."
     else:
         prompt = (
-            f"Generate {n} startup ideas and go-to-market strategies for: {topic}. "
-            "Return exactly this XML format only:\n"
-            "<response><text>...</text><probability>0.01</probability></response>"
+            f"Generate exactly {n} startup ideas for: {topic}.\n"
+            "Return exactly this XML format and NOTHING else:\n"
+            "<response><text>[one idea only, single sentence, no numbering]</text>"
+            "<probability>[numeric < 0.10]</probability></response>\n"
+            "Rules: output exactly 5 separate <response> blocks, one idea per block, "
+            "do not combine multiple ideas in one block, no markdown/prose."
         )
         system = "You generate clear practical startup ideas."
-    raw = _chat_with_fallback(
-        model,
-        system,
-        prompt,
-        temperature=0.85 if mode == "verbalized_sampling" else 0.6,
-    )
-    ideas = _parse_ideas(raw, limit=n)
+    temperature = 0.85 if mode == "verbalized_sampling" else 0.6
+    client = _client()
 
-    # Free models sometimes ignore XML formatting; run one repair pass if too few ideas.
-    if len(ideas) < n:
-        repair_prompt = (
-            f"Convert the content below into exactly {n} distinct startup ideas. "
-            "Output one idea per line, no numbering, no markdown.\n\n"
-            f"CONTENT:\n{raw}"
-        )
-        repaired_raw = _chat_with_fallback(
-            model,
-            "You are a strict output formatter.",
-            repair_prompt,
-            temperature=0.2,
-        )
-        repaired_ideas = _parse_ideas(repaired_raw, limit=n)
-        if len(repaired_ideas) > len(ideas):
-            ideas = repaired_ideas
+    best_ideas: List[str] = []
+    best_raw = ""
+    last_error: Exception | None = None
 
-    return ideas, raw
+    # Try model candidates until one produces the requested count.
+    for candidate in _model_candidates(model):
+        try:
+            raw = _chat_with_fallback_using_client(
+                client,
+                candidate,
+                system,
+                prompt,
+                temperature=temperature,
+            )
+        except Exception as exc:  # noqa: BLE001
+            last_error = exc
+            continue
+
+        ideas = _parse_ideas(raw, limit=n)
+        if len(ideas) < n:
+            repair_prompt = (
+                f"Convert the content below into exactly {n} distinct startup ideas. "
+                "Output one idea per line, no numbering, no markdown.\n\n"
+                f"CONTENT:\n{raw}"
+            )
+            try:
+                repaired_raw = _chat_with_fallback_using_client(
+                    client,
+                    candidate,
+                    "You are a strict output formatter.",
+                    repair_prompt,
+                    temperature=0.2,
+                )
+                repaired_ideas = _parse_ideas(repaired_raw, limit=n)
+                if len(repaired_ideas) > len(ideas):
+                    ideas = repaired_ideas
+            except Exception as exc:  # noqa: BLE001
+                last_error = exc
+
+        if len(ideas) > len(best_ideas):
+            best_ideas = ideas
+            best_raw = raw
+        if len(ideas) >= n:
+            return ideas[:n], raw
+
+    if best_ideas:
+        return best_ideas[:n], best_raw
+    raise RuntimeError(f"All model candidates failed to produce ideas. Last error: {last_error}")
 
 
 @st.cache_data
@@ -407,6 +470,8 @@ def main() -> None:
                         f"Direct parsing returned {len(direct_ideas)}/{n_ideas} ideas. "
                         "Model format was inconsistent; retry for fuller output."
                     )
+                    st.markdown("#### Direct raw output (auto-shown due to short parse)")
+                    st.code(direct_raw)
                 if len(vs_ideas) < n_ideas:
                     st.warning(
                         f"VS parsing returned {len(vs_ideas)}/{n_ideas} ideas. "
